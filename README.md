@@ -19,6 +19,10 @@ A Chrome extension for AIUB students. Open your portal dashboard and it download
 
 Moved the folder or updated the extension? Run `Setup.bat` again and click reload on the extension.
 
+## Demo video
+
+[Watch the demo video](https://drive.google.com/file/d/1DQpTqMiXLZx4bEwWXZ304KWwHeznFBgC/view?usp=sharing)
+
 ## Folders
 
 ​```
