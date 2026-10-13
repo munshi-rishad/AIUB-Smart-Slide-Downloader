@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AIUB Course Material Downloader",
-  "version": "6.0",
-  "description": "Auto-checks your active AIUB courses' Notes after login and saves only new/missing files into Desktop/AIUB/<Course>/ (needs the small AIUB helper installed once).",
+  "name": "AIUB Smart Slide Downloader",
+  "version": "7.0",
+  "description": "Greets you by name, finds your active AIUB courses and downloads only new or missing slides/notes into Desktop/AIUB/<Course>/.",
   "permissions": [
     "downloads",
     "scripting",
@@ -27,7 +27,7 @@
     }
   ],
   "action": {
-    "default_title": "AIUB Downloader - check for new files now"
+    "default_title": "AIUB Smart Slide Downloader - check for new files now"
   },
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp4anhXkrWEm5/iH3lHpJWzNjs3cNeCJ9i0n3jNtL8J7GZOO00TTuAUtpXEFLtnTJ88YfP+0d2EYFdGAUUAR9YCyn1wztkZt6WCeaktXsrbTps0xR7jJVn2U1XA0ZiBGsV78ODRJIt84Ys7SlIYzTb6vg44naJnbf4cAg5ObU/KVoWZqCsnEQVycbCZkGbS28G/PBkhqTvC4NDMT92gdMoCcStwU+6Pb05Vg+Eo78jS8bEdkaaQsjVVRZS8s+KBWgTSkYvJjbwQrGnunb84ouKNuKxJX07L2DzWjPk5UeZyAKciVYVYjWCLtbibd/mbczbJwGhGn0jNZ06lsgSkUZEQIDAQAB"
 }

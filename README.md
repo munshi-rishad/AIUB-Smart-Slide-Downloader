@@ -1,67 +1,77 @@
+# AIUB Smart Slide Downloader
 
-# AIUB Smart Course Downloader
+A small Chrome extension for AIUB students. Open your portal dashboard and it greets you by name, finds your **active** courses, and saves only the **new or missing** slides and notes into `Desktop/AIUB/<Course>/`. Nothing is downloaded twice.
 
-A Chrome extension that automatically detects, downloads, and organizes course materials from the AIUB Student Portal.
+```
+Welcome, Rishad
+ ├─ Operating System [D]            Up to date ✓
+ ├─ Data Warehousing and Data Mining Done ✓
+ └─ Research Methodology [P]        Downloading 3/4  ▬▬▬▬▬▬▭▭
+```
+
+When everything is finished the panel closes itself after 2 seconds.
 
 ## Features
 
-- Automatically detects active courses from the student dashboard.
-- Finds and downloads available course materials.
-- Skips previously downloaded files.
-- Organizes materials into separate course folders.
-- Shows download progress and status.
-- Supports automatic scanning and manual re-checking.
-- Saves files to Desktop/AIUB using the Windows helper.
-- Uses Chrome Downloads when the helper is unavailable.
+- Greets you with your name from the portal ("Welcome, Rishad").
+- Active courses only. Dropped or invalid courses are ignored.
+- One progress bar per course, with the number of new files.
+- Smart sync: compares each course folder with the portal and downloads only what is new or missing. Deleted a file by mistake? It comes back on the next visit.
+- Fast: all courses are checked at the same time, files download in parallel, one helper process handles everything.
+- Compact panel that fits laptop and desktop screens.
+- Automatic on every dashboard load, plus a manual re-check by clicking the extension icon.
 
-## Technologies
+## Quick setup (Windows + Chrome, about one minute)
 
-- JavaScript
-- Chrome Extension (Manifest V3)
-- Chrome Downloads API
-- Chrome Native Messaging
-- PowerShell
-- Windows Batch
+1. Download or clone this repository and keep the folder somewhere permanent (for example `Documents`).
+2. Double-click **`Setup.bat`**. It creates `Desktop/AIUB`, connects Chrome to the helper, copies the `extension` folder path to your clipboard and opens `chrome://extensions`.
+3. In Chrome: turn on **Developer mode**, click **Load unpacked**, paste the path (Ctrl+V), press Enter and choose the folder.
+4. Open your AIUB portal dashboard. Done.
 
-## Installation
+Already installed an older version? Run `Setup.bat` again and click the reload icon on the extension.
 
-1. Clone or download this repository.
-2. Open `chrome://extensions/` in Google Chrome.
-3. Enable **Developer Mode**.
-4. Click **Load Unpacked**.
-5. Select the `aiub-ext` folder.
-6. For Desktop downloads, run `aiub-helper/install.bat` on Windows.
-7. Reload the extension after installing the helper.
+Moved the folder? Run `Setup.bat` again so Chrome knows the new location.
 
-## How to Use
+## Project layout
 
-1. Visit https://portal.aiub.edu/
-2. Log in using your own AIUB account.
-3. Open your student dashboard.
-4. The extension automatically scans active courses.
-5. New materials are downloaded into course-specific folders.
-6. Click the extension icon to scan again manually.
+```
+AIUB-Smart-Slide-Downloader/
+├── Setup.bat            one-click setup
+├── extension/           the Chrome extension (load this folder)
+│   ├── manifest.json
+│   ├── background.js    downloads and talks to the helper
+│   └── panel.js         the panel on the portal page
+└── helper/              Windows helper that writes into Desktop/AIUB
+    ├── install.ps1
+    ├── host.ps1
+    └── host.bat
+```
 
-## Download Location
+## How it works
 
-With the Windows helper installed:
+1. `panel.js` runs on the dashboard, reads your name and active courses, and opens each course's Notes page with your own logged-in session.
+2. `background.js` asks the helper which files already exist in `Desktop/AIUB/<Course>`.
+3. Only the missing files are fetched and streamed to the helper, which writes them to disk (a `.part` file first, so a failed download never leaves a broken file).
 
-    Desktop/
-    └── AIUB/
-        ├── Course A/
-        │   ├── Lecture 01.pdf
-        │   └── Slides.pptx
-        └── Course B/
-            └── Notes.pdf
+Without the helper (or if you press **Skip**), files go to your Chrome Downloads folder under `AIUB/<Course>` instead.
 
-Without the helper, files are saved in the configured Chrome Downloads directory.
+## Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| Panel says "Setup needed" | Double-click `Setup.bat`, then press **Check again** |
+| "Wrong page" | Open the dashboard (`portal.aiub.edu/Student`) |
+| A file failed | Press **Retry**, or click the extension icon later |
+| "got a web page, not a file" | Your portal session expired. Log in again |
+| Panel is gone too fast | Hover over it and it stays open |
 
 ## Privacy
 
-- No password collection.
-- Uses your existing authenticated portal session.
-- Works with course materials you are authorized to access.
+- No passwords are read, stored or sent anywhere.
+- Uses your existing logged-in portal session and only talks to `portal.aiub.edu`.
+- Only your first name (from the portal's welcome text) is remembered in the page's local storage to show the greeting.
+- Works only with course materials you are already allowed to access.
 
 ## Disclaimer
 
-This is an unofficial student project and is not affiliated with or endorsed by American International University-Bangladesh (AIUB).
+An unofficial student project, not affiliated with or endorsed by American International University-Bangladesh (AIUB).
