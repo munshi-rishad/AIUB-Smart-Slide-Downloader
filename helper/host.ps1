@@ -1,3 +1,6 @@
+# AIUB Smart Slide Downloader - helper for Chrome "native messaging".
+# Reads messages from the extension (stdin) and saves the course files it sends into Desktop\AIUB\<Course>.
+# It only writes inside Desktop\AIUB. It makes no network connections and starts no other programs.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $in   = [Console]::OpenStandardInput()

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AIUB Smart Slide Downloader",
-  "version": "7.0",
-  "description": "Greets you by name, finds your active AIUB courses and downloads only new or missing slides/notes into Desktop/AIUB/<Course>/.",
+  "version": "8.0",
+  "description": "Greets you by name, downloads only new or missing slides/notes into Desktop/AIUB/<Course>/ automatically for the current semester, and lets you pick old semesters/courses manually.",
   "permissions": [
     "downloads",
     "scripting",

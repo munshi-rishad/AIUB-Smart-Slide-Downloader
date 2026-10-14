@@ -46,6 +46,21 @@
 .g button{border:0;border-radius:8px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;margin:7px 6px 0 0}
 .g .go{background:#0a3374;color:#fff}.g .no{background:#e6e9ef;color:#334}
 .g .ge{color:#c0392b;margin-top:6px;font-size:11.5px}
+.ch{display:block;flex:none;border:0;border-radius:8px;padding:6px 12px;background:#e6edf8;color:#0a3374;font-size:12px;font-weight:600;cursor:pointer}
+.ch:hover{background:#d5e2f6}
+.bt{display:flex;gap:6px;flex:none}
+.pk{display:none}
+.pk .lb{display:block;font-size:11.5px;font-weight:600;color:#3a5675;margin:2px 2px 4px}
+.pk select{width:100%;padding:8px 9px;border:1px solid #c3d2e8;border-radius:10px;font-size:13px;font-weight:600;color:#0a3374;background:#fff;cursor:pointer}
+.pk select:disabled{opacity:.6;cursor:wait}
+.cnt{font-size:12px;font-weight:600;color:#3a5675;margin:10px 2px 6px}
+.it{display:flex;align-items:flex-start;gap:9px;background:#fff;border-radius:11px;padding:9px 11px;margin-bottom:6px;cursor:pointer;font-size:12.5px;font-weight:600;color:#0a3374;line-height:1.3;box-shadow:0 1px 2px rgba(11,40,90,.07);border:2px solid transparent}
+.it input{flex:none;margin:1px 0 0;accent-color:#1767c7;cursor:pointer}
+.it.sel{border-color:#1767c7;background:#eef4fd}
+.pa{display:flex;gap:8px;padding-top:4px}
+.pa button{flex:1;border:0;border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer}
+.pa .ok{background:#0a3374;color:#fff}.pa .ok:disabled{background:#b9c5d8;cursor:not-allowed}
+.pa .cn{background:#e6e9ef;color:#334}
 @media (prefers-reduced-motion:reduce){.p,.pg div,.bar div{animation:none;transition:none}}
 </style>
 <div class="p" id="p">
@@ -53,14 +68,22 @@
   <div class="pg ind" id="pg"><div id="o"></div></div>
   <div class="b">
     <div class="g" id="g"></div>
+    <div class="pk" id="pk">
+      <label class="lb" for="sem">Semester</label>
+      <select id="sem"></select>
+      <div class="cnt" id="cnt"></div>
+      <div id="cl"></div>
+      <div class="pa"><button class="ok" id="ok" disabled>OK</button><button class="cn" id="cn">Cancel</button></div>
+    </div>
     <div id="cs"></div>
-    <div class="ft"><span class="m" id="m"></span><button class="rt" id="rt">Retry</button></div>
+    <div class="ft"><span class="m" id="m"></span><span class="bt"><button class="ch" id="ch">Old semesters</button><button class="rt" id="rt">Retry</button></span></div>
   </div>
 </div>`;
   document.documentElement.appendChild(host);
   const $ = id => root.getElementById(id);
   let closeT = null;
-  const closeNow = () => { clearTimeout(closeT); $('p').classList.add('out'); setTimeout(() => host.remove(), 280); };
+  let semChanged = false, semOrig = -1, picked = null, pickList = [], lastCourses = null;
+  const closeNow = () => { clearTimeout(closeT); restoreSem(); $('p').classList.add('out'); setTimeout(() => host.remove(), 280); };
   $('x').onclick = closeNow;
   $('p').addEventListener('mouseenter', () => clearTimeout(closeT));   // hovering keeps the panel open
   const msg = (t, c) => { $('m').textContent = t; $('m').style.color = c || '#0a3374'; };
@@ -101,7 +124,7 @@
   }
 
   // ---------- Portal scraping ----------
-  function extractCourses() {
+  function extractCourses(withDropped) {
     const out = [], seen = new Set();
     document.querySelectorAll('a').forEach(a => {
       if (!/^\s*Notes\s*$/i.test(a.textContent)) return;
@@ -115,12 +138,13 @@
       const parts = text.split(/Status\s*:/i);
       const tail = (parts[parts.length - 1] || '').split(/Result/i)[0];
       const w = (tail.match(/Dropped|Invalid|Valid/gi) || []).map(x => x.toLowerCase());
-      const active = w.includes('valid') && !w.includes('dropped') && !w.includes('invalid');
-      if (!active) return;   // dropped courses: completely ignored, not even listed
+      const dropped = w.includes('dropped');
+      const active = w.includes('valid') && !w.includes('invalid') && (withDropped || !dropped);
+      if (!active) return;   // current semester: dropped courses ignored; old-semester picker: they are included
       const raw = a.getAttribute('href') || '';
       const href = raw && !/^(#|javascript)/i.test(raw) ? new URL(raw, location.href).href : '';
       if (!href || seen.has(title)) return; seen.add(title);
-      out.push({ title, href });
+      out.push({ title, href, dropped });
     });
     return out;
   }
@@ -219,7 +243,7 @@
   function card(c) {
     const el = document.createElement('div'); el.className = 'c';
     el.innerHTML = '<div class="r"><span class="nm"></span><span class="bd"></span></div><div class="bar"><div></div></div><div class="er"></div>';
-    const nm = el.querySelector('.nm'); nm.textContent = pretty(c.title); nm.title = c.title;
+    const nm = el.querySelector('.nm'); nm.textContent = pretty(c.title) + (c.dropped ? ' (Dropped)' : ''); nm.title = c.title;
     c.bd = el.querySelector('.bd'); c.bar = el.querySelector('.bar'); c.fill = el.querySelector('.bar div'); c.er = el.querySelector('.er');
     setBd(c, 'Waiting', '');
     $('cs').appendChild(el);
@@ -228,12 +252,95 @@
   const prog = c => { const done = c.ok + c.bad; c.fill.style.width = Math.round(100 * done / c.todo.length) + '%'; setBd(c, `Downloading ${done}/${c.todo.length}`, 'b'); };
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
+  // ---------- Semester picker (mirrors the portal's Registration dropdown) ----------
+  const SEM_RX = /\d{4}\s*-\s*\d{4}\s*,\s*(Spring|Summer|Fall)/i;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const snap = () => [...document.querySelectorAll('a')].filter(a => /^\s*Notes\s*$/i.test(a.textContent)).map(a => a.getAttribute('href') || '').join('|');
+  const fire = sel => { sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); };
+  function findSemSelect() {   // the <select> inside the "Registration" box
+    const all = [...document.querySelectorAll('select')].filter(s => [...s.options].some(o => SEM_RX.test(o.textContent)));
+    for (const s of all) {
+      let a = s;
+      for (let i = 0; i < 6 && a.parentElement; i++) { a = a.parentElement; if (/^\s*Registration\b/i.test(a.innerText || '')) return s; }
+    }
+    return all[0] || null;
+  }
+  async function waitSettled(prev) {   // wait until the portal has swapped in the new semester's cards
+    const t0 = Date.now(); let last = snap(), lastT = t0, changed = false;
+    while (Date.now() - t0 < 10000) {
+      await sleep(150);
+      const cur = snap();
+      if (cur !== last) { last = cur; lastT = Date.now(); }
+      if (cur !== prev) changed = true;
+      const stable = Date.now() - lastT >= 600, el = Date.now() - t0;
+      if (changed && stable && (cur || el > 4000)) break;   // an empty result waits a little longer
+      if (!changed && stable && el > 5000) break;
+    }
+  }
+  async function switchSem(idx) {
+    const sel = findSemSelect(); if (!sel) return false;
+    if (sel.selectedIndex === idx) return true;
+    const prev = snap();
+    sel.selectedIndex = idx; fire(sel); semChanged = true;
+    await waitSettled(prev);
+    return true;
+  }
+  function restoreSem() {   // put the portal back on the semester it was showing
+    if (!semChanged) return; semChanged = false;
+    const sel = findSemSelect();
+    if (sel && semOrig >= 0 && sel.selectedIndex !== semOrig) { sel.selectedIndex = semOrig; fire(sel); }
+  }
+  function addItem(label, val) {
+    const l = document.createElement('label'); l.className = 'it';
+    const r = document.createElement('input'); r.type = 'radio'; r.name = 'course';
+    const t = document.createElement('span'); t.textContent = label;
+    l.append(r, t);
+    r.onchange = () => { picked = val; $('ok').disabled = false; [...$('cl').children].forEach(x => x.classList.toggle('sel', x === l)); };
+    $('cl').appendChild(l);
+  }
+  async function loadSem() {
+    const idx = +$('sem').value;
+    picked = null; pickList = []; $('ok').disabled = true; $('cl').innerHTML = ''; $('sem').disabled = true;
+    $('cnt').textContent = 'Loading courses…'; setProg(true);
+    let list = [];
+    try { if (await switchSem(idx)) list = extractCourses(true); } catch (e) {}
+    pickList = list; $('sem').disabled = false; setProg(false);
+    if (!list.length) { $('cnt').textContent = 'No courses in this semester'; return; }
+    $('cnt').textContent = `${plural(list.length, 'course')} in this semester`;
+    list.forEach(c => addItem(pretty(c.title) + (c.dropped ? ' (Dropped)' : ''), c));
+    if (list.length > 1) addItem('All courses', 'all');
+  }
+  async function openPicker() {
+    clearTimeout(closeT);
+    $('cs').style.display = 'none'; $('rt').style.display = 'none'; $('ch').style.display = 'none'; $('g').style.display = 'none'; msg('');
+    $('pk').style.display = 'block'; sub('Pick a semester'); setProg(true);
+    const sel = findSemSelect();
+    if (!sel) { sub('Semester list not found'); setProg(false); $('pk').style.display = 'none'; msg('Could not find the Registration semester list on this page.', '#c0392b'); return; }
+    if (semOrig < 0) semOrig = sel.selectedIndex;
+    $('sem').innerHTML = '';
+    const semIdx = [...sel.options].map((o, i) => SEM_RX.test(o.textContent) ? i : -1).filter(i => i >= 0);
+    semIdx.pop();   // the newest semester is the current one: it is always downloaded automatically
+    if (!semIdx.length) { sub('No old semesters'); setProg(false); $('pk').style.display = 'none'; msg('No old semesters found in the Registration list.', '#c0392b'); return; }
+    semIdx.forEach(i => { const e = document.createElement('option'); e.value = i; e.textContent = sel.options[i].textContent.trim(); $('sem').appendChild(e); });
+    $('sem').value = String(semIdx[semIdx.length - 1]);   // start on the most recent old semester
+    await loadSem();
+  }
+  $('sem').onchange = () => loadSem();
+  $('cn').onclick = closeNow;
+  $('ch').onclick = () => { openPicker(); };
+  $('ok').onclick = () => {
+    if (!picked) return;
+    const list = picked === 'all' ? pickList : [picked];
+    $('pk').style.display = 'none'; $('cs').style.display = '';
+    window.__aiubRunning = true;
+    runCourses(list).catch(fail).finally(() => { window.__aiubRunning = false; });
+  };
+
   // ---------- Main flow ----------
   async function start() {
     window.__aiubRunning = true;
     clearTimeout(closeT);
-    Object.assign(S, { a: 0, f: 0, d: 0, k: 0, e: 0, n: 0 });
-    $('cs').innerHTML = ''; $('rt').style.display = 'none'; $('g').style.display = 'none'; msg(''); setProg(true);
+    $('cs').innerHTML = ''; $('rt').style.display = 'none'; $('ch').style.display = 'block'; $('g').style.display = 'none'; msg(''); setProg(true);
     const name = firstName();
     $('hi').textContent = name ? `Welcome, ${name}` : 'Welcome';
     if (!DASH.test(location.href)) {
@@ -242,11 +349,20 @@
     sub('Finding your courses…');
     let courses = extractCourses();
     for (let i = 0; i < 100 && !courses.length; i++) { await new Promise(r => setTimeout(r, 200)); courses = extractCourses(); }
+    if (!courses.length) { sub('No courses found'); setProg(false); msg('No active courses found on this page.', '#c0392b'); $('ch').style.display = 'block'; if (!manual) closeT = setTimeout(closeNow, 2500); return; }
+    await runCourses(courses);
+  }
+
+  // download the given courses (shared by auto mode and the semester picker)
+  async function runCourses(courses) {
+    lastCourses = courses;
+    clearTimeout(closeT);
+    Object.assign(S, { a: 0, f: 0, d: 0, k: 0, e: 0, n: 0 });
+    $('cs').innerHTML = ''; $('rt').style.display = 'none'; $('ch').style.display = 'block'; $('g').style.display = 'none'; msg(''); setProg(true);
     S.a = courses.length;
-    if (!courses.length) { sub('No courses found'); setProg(false); msg('No active courses found on this page.', '#c0392b'); if (!manual) closeT = setTimeout(closeNow, 2500); return; }
     courses.forEach(card);
     sub(`${plural(courses.length, 'active course')} · checking files…`);
-    courses.forEach(c => { c.folder = limitName(sanitize(c.title.replace(/^\d+\s*-\s*/, '')), 60); });
+    courses.forEach(c => { c.folder = limitName(sanitize(c.title.replace(/^\d+\s*-\s*/, '')), 60) + (c.dropped ? ' (Dropped)' : ''); });
 
     // portal scan and Desktop-folder listing run at the same time
     const scanP = Promise.all(courses.map(c => scanL(async () => {
@@ -292,14 +408,15 @@
     // finish
     setProg(false);
     if (S.e) {
-      sub('Some files failed'); msg(`${S.d} saved, ${S.e} failed.`, '#c0392b'); $('rt').style.display = 'block';
+      sub('Some files failed'); msg(`${S.d} saved, ${S.e} failed.`, '#c0392b'); $('rt').style.display = 'block'; $('ch').style.display = 'block';
     } else {
       sub(helper ? 'Saved in Desktop → AIUB' : 'Saved in Downloads → AIUB');
       msg(S.d ? `All done! ${plural(S.d, 'new file')} saved ✓` : 'All files are up to date ✓', '#13703a');
+      $('ch').style.display = 'block';
       closeT = setTimeout(closeNow, 2000);   // closes by itself 2s after finishing
     }
   }
-  $('rt').onclick = () => start().catch(fail).finally(() => { window.__aiubRunning = false; });
-  const fail = e => { sub('Something went wrong'); setProg(false); msg('Error: ' + e.message, '#c0392b'); $('rt').style.display = 'block'; };
+  $('rt').onclick = () => { window.__aiubRunning = true; (lastCourses ? runCourses(lastCourses) : start()).catch(fail).finally(() => { window.__aiubRunning = false; }); };
+  const fail = e => { sub('Something went wrong'); setProg(false); msg('Error: ' + e.message, '#c0392b'); $('rt').style.display = 'block'; $('ch').style.display = 'block'; };
   start().catch(fail).finally(() => { window.__aiubRunning = false; });
 })();

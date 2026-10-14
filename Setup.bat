@@ -5,8 +5,11 @@ cd /d "%~dp0"
 echo.
 echo  AIUB Smart Slide Downloader - one-time setup
 echo  ---------------------------------------------
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0helper\install.ps1"
-if errorlevel 1 (
+pushd "%~dp0"
+powershell -NoProfile -ExecutionPolicy RemoteSigned -Command "Get-ChildItem helper,extension -Recurse -File | Unblock-File; & .\helper\install.ps1"
+set "RC=%errorlevel%"
+popd
+if not "%RC%"=="0" (
   echo.
   echo  Setup failed. Please send a screenshot of this window.
   pause
