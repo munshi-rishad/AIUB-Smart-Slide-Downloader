@@ -29,10 +29,6 @@ The portal is switched back to your original semester when the panel closes.
 
 Moved the folder or updated the extension? Run `Setup.bat` again and click reload on the extension.
 
-## Demo video
-
-[Watch the demo video](https://drive.google.com/file/d/1DQpTqMiXLZx4bEwWXZ304KWwHeznFBgC/view?usp=sharing)
-
 ## Folders
 
 ​```
