@@ -2,6 +2,8 @@
 
 A Chrome extension for AIUB students. Open your portal dashboard and it downloads only the new or missing course files into `Desktop/AIUB/<Course>/`.
 
+**Semester:** Fall 2026-2027
+
 ## Features
 
 - Greets you by name ("Welcome, Rishad")
