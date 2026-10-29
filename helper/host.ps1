@@ -95,7 +95,7 @@ while ($true) {
 
     # fast path for big file chunks (no JSON parsing, no regex over megabytes)
     if ($raw.Length -gt 40 -and $raw.EndsWith('"}') -and $raw.StartsWith('{"id":')) {
-      $cm = [regex]::Match($raw.Substring(0, 80), '^\{"id":(\d+),"op":"chunk","fid":(\d+),"data":"')
+      $cm = [regex]::Match($raw.Substring(0, [Math]::Min(80, $raw.Length)), '^\{"id":(\d+),"op":"chunk","fid":(\d+),"data":"')   # a small last piece is shorter than 80
       if ($cm.Success) {
         $id = [int]$cm.Groups[1].Value
         $s = $streams[$cm.Groups[2].Value]
