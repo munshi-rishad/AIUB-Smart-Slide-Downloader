@@ -1,4 +1,8 @@
 {
+  "11.1": [
+    "Checks for a new version every time you open the dashboard",
+    "Clearer setup window: Chrome profiles are listed by e-mail address"
+  ],
   "11.0": [
     "Asks before updating: \"Update now\" or \"Later\" (panel and Windows notification)",
     "Safer updates: the new version is swapped in all at once, with a rollback if anything fails",

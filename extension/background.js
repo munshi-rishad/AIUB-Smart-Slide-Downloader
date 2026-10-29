@@ -63,11 +63,11 @@ async function remoteNotes(v) {   // what's new in every version after the insta
       .map(k => ({ v: k, items: (Array.isArray(all[k]) ? all[k] : [all[k]]).map(x => String(x).slice(0, 200)).slice(0, 8) })).slice(0, 5);
   } catch (e) { return []; }
 }
-async function checkUpdate() {
+async function checkUpdate(every) {   // every: minimum time between two checks (30 min in the background, 2 min when the dashboard opens)
   const C = AIUB.CFG; if (!C.AUTO_UPDATE) return;
   try {
     const { updChecked = 0 } = await store.get('updChecked');
-    if (Date.now() - updChecked >= UPD_EVERY) {
+    if (Date.now() - updChecked >= (every || UPD_EVERY)) {
       const r = await fetch(`https://raw.githubusercontent.com/${C.UPDATE_REPO}/${C.UPDATE_BRANCH}/extension/manifest.json`, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
       if (r.ok) {
         const v = String((await r.json()).version || '');
@@ -402,7 +402,7 @@ chrome.runtime.onMessage.addListener((m, s, reply) => {
     return false;
   }
   if (m.cmd === 'unlock') { if (runLock && runLock.tab === (s.tab && s.tab.id)) { runLock = null; Zip.clearCache(); setTimeout(maybeApply, 1500); } return false; }
-  if (m.cmd === 'checkUpdate') { answer(checkUpdate().then(() => ({ ok: true }))); return true; }
+  if (m.cmd === 'checkUpdate') { answer(checkUpdate(2 * 60000).then(() => ({ ok: true }))); return true; }
   if (m.cmd === 'updateNow') { answer(approveUpdate()); return true; }
   if (m.cmd === 'updateLater') { answer(snoozeUpdate()); return true; }
   if (m.cmd === 'zipList') { answer(Zip.list(m.url).then(entries => ({ ok: true, entries }))); return true; }
