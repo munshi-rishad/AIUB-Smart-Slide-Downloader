@@ -1,0 +1,10 @@
+{
+  "11.0": [
+    "Asks before updating: \"Update now\" or \"Later\" (panel and Windows notification)",
+    "Safer updates: the new version is swapped in all at once, with a rollback if anything fails",
+    "Your saved files follow every new version: renamed or moved into the new names and folders automatically",
+    "A file the teacher edited online is downloaded again (your old copy is kept in \"_Old versions\")",
+    "Old .zip files whose contents are now unpacked move to \"_Old versions\"",
+    "Fixed: updates now come from the right GitHub repository"
+  ]
+}

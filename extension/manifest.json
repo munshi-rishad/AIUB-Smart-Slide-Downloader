@@ -1,16 +1,28 @@
 {
   "manifest_version": 3,
   "name": "AIUB Smart Slide Downloader",
-  "version": "8.0",
-  "description": "Greets you by name, downloads only new or missing slides/notes into Desktop/AIUB/<Course>/ automatically for the current semester, and lets you pick old semesters/courses manually.",
+  "version": "11.0",
+  "description": "Downloads only new or missing slides/notes from the AIUB portal and your Microsoft Teams classes into Desktop/AIUB/<Course>/, numbered in course order, without duplicates. Asks before installing a new version.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": [
     "downloads",
     "scripting",
     "activeTab",
-    "nativeMessaging"
+    "nativeMessaging",
+    "storage",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
-    "https://portal.aiub.edu/*"
+    "https://portal.aiub.edu/*",
+    "https://aiubedu60714.sharepoint.com/*",
+    "https://raw.githubusercontent.com/*",
+    "https://github.com/*",
+    "https://codeload.github.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -21,13 +33,28 @@
         "https://portal.aiub.edu/Student*"
       ],
       "js": [
+        "lib.js",
         "panel.js"
       ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://aiubedu60714.sharepoint.com/sites/msteams_*"
+      ],
+      "js": [
+        "site-learner.js"
+      ],
+      "all_frames": true,
       "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_title": "AIUB Smart Slide Downloader - check for new files now"
+    "default_title": "AIUB Smart Slide Downloader - check for new files now",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png"
+    }
   },
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp4anhXkrWEm5/iH3lHpJWzNjs3cNeCJ9i0n3jNtL8J7GZOO00TTuAUtpXEFLtnTJ88YfP+0d2EYFdGAUUAR9YCyn1wztkZt6WCeaktXsrbTps0xR7jJVn2U1XA0ZiBGsV78ODRJIt84Ys7SlIYzTb6vg44naJnbf4cAg5ObU/KVoWZqCsnEQVycbCZkGbS28G/PBkhqTvC4NDMT92gdMoCcStwU+6Pb05Vg+Eo78jS8bEdkaaQsjVVRZS8s+KBWgTSkYvJjbwQrGnunb84ouKNuKxJX07L2DzWjPk5UeZyAKciVYVYjWCLtbibd/mbczbJwGhGn0jNZ06lsgSkUZEQIDAQAB"
 }
