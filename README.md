@@ -65,7 +65,7 @@ Or download the ZIP from GitHub and extract it anywhere.
 ## Setup and Run
 
 1. Double-click `Setup.bat`. It copies everything to `%LOCALAPPDATA%\AIUB-Smart-Slide-Downloader`, creates `Desktop/AIUB` and registers the helper. The downloaded folder can be deleted afterwards.
-2. If you have several Chrome profiles, choose the one where you use the AIUB portal and Teams.
+2. If you have several Chrome profiles, Setup lists them by e-mail address: choose the account you use for the AIUB portal and Teams.
 3. On the Chrome Extensions page turn on **Developer mode**, click **Load unpacked**, press Ctrl+V (the path is already copied) and select the folder. Chrome does not allow programs to install extensions silently, so this step is done once by hand.
 4. Open your AIUB dashboard (`portal.aiub.edu/Student`). The panel appears and downloads your files.
 
@@ -122,7 +122,7 @@ Every Teams class keeps its Shared files in a SharePoint library (`aiubedu60714.
 The source is small and fully readable. Nothing is hidden or packed.
 
 - `Setup.bat` runs `helper/install.ps1` and opens Chrome. No admin rights.
-- `helper/install.ps1` creates `Desktop/AIUB`, writes `com.aiub.downloader.json` and adds one registry value under `HKCU\Software\Google\Chrome\NativeMessagingHosts`. It does not read any Chrome data (only the names of the profile folders).
+- `helper/install.ps1` creates `Desktop/AIUB`, writes `com.aiub.downloader.json` and adds one registry value under `HKCU\Software\Google\Chrome\NativeMessagingHosts`. To show which Chrome profile is which, it reads only the profile names and e-mail addresses from Chrome's `Local State` file (no cookies, passwords or history).
 - `helper/host.ps1` saves the files sent by the extension into `Desktop/AIUB` and stores extension updates. No network access, no window.
 - `extension/` talks only to `portal.aiub.edu`, AIUB's SharePoint and this GitHub repository (for updates).
 

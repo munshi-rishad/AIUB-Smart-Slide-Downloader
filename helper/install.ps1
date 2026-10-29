@@ -7,7 +7,8 @@
 #   3. writes com.aiub.downloader.json and adds ONE registry value under HKCU\Software\Google\Chrome\NativeMessagingHosts
 #   4. starts the helper once to check that it can run
 #   5. opens Chrome in the profile you choose with the AIUB portal and Teams (first time: also chrome://extensions).
-#      It does NOT read any Chrome data (no cookies, no sign-in or profile files).
+#      To show which profile is which, it reads ONLY the profile names and e-mail addresses from Chrome's
+#      "Local State" file. No cookies, passwords, history or sign-in data are read.
 param([string]$Source = '')
 $ErrorActionPreference = 'Stop'
 $id = 'nilibfinpegehgnhbnikacfijddjjbmc'   # fixed extension ID (set by the "key" in extension/manifest.json)
@@ -85,12 +86,39 @@ try {
 } catch { Warn ('Could not check the helper: ' + $_.Exception.Message) }
 
 # ---- 5. open Chrome: portal + Teams (+ the extensions page the first time) ----
-# This script never reads Chrome's profile, cookie or sign-in files (only the NAMES of the profile folders are listed).
+# Only the profile names and e-mail addresses are read (from "Local State"); no cookies, passwords or history.
+function Get-ProfileInfo([string]$ud) {
+  # folder name -> @{ Mail; Name } from Chrome's "Local State" (only these two fields are used)
+  $map = @{}
+  $f = Join-Path $ud 'Local State'
+  if (-not (Test-Path $f)) { return $map }
+  $raw = Get-Content $f -Raw -Encoding UTF8
+  try {
+    $ic = ($raw | ConvertFrom-Json).profile.info_cache
+    foreach ($pr in $ic.PSObject.Properties) { $v = $pr.Value; $n = [string]$v.name; if (-not $n) { $n = [string]$v.gaia_name }; $map[$pr.Name] = @{ Mail = [string]$v.user_name; Name = $n } }
+  } catch {
+    try {   # Windows PowerShell cannot read some Local State files (keys that differ only in capital letters): .NET can
+      Add-Type -AssemblyName System.Web.Extensions
+      $js = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+      $js.MaxJsonLength = [int]::MaxValue
+      $ic = $js.DeserializeObject($raw)['profile']['info_cache']
+      foreach ($k in $ic.Keys) { $v = $ic[$k]; $n = [string]$v['name']; if (-not $n) { $n = [string]$v['gaia_name'] }; $map[$k] = @{ Mail = [string]$v['user_name']; Name = $n } }
+    } catch { }
+  }
+  return $map
+}
 function Get-Profiles {
   $list = @()
   $ud = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data'
   if (Test-Path $ud) {
-    foreach ($d in @(Get-ChildItem $ud -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' } | Sort-Object { if ($_.Name -eq 'Default') { -1 } else { [int]('0' + ($_.Name -replace '\D', '')) } })) { $list += [pscustomobject]@{ Dir = $d.Name } }
+    $info = @{}
+    try { $info = Get-ProfileInfo $ud } catch { }
+    foreach ($d in @(Get-ChildItem $ud -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' } | Sort-Object { if ($_.Name -eq 'Default') { -1 } else { [int]('0' + ($_.Name -replace '\D', '')) } })) {
+      if ($info.Count -and -not $info.ContainsKey($d.Name)) { continue }   # a folder Chrome no longer lists (deleted profile)
+      $x = $info[$d.Name]; $mail = ''; $nm = ''
+      if ($x) { $mail = $x.Mail; $nm = $x.Name }
+      $list += [pscustomobject]@{ Dir = $d.Name; Mail = $mail; Name = $nm }
+    }
   }
   return $list
 }
@@ -104,19 +132,23 @@ function Choose-Profile($profiles) {
   if (-not $def) { $def = $profiles[0].Dir }
   Write-Host ''
   Write-Host '   CHOOSE YOUR CHROME PROFILE' -ForegroundColor White
-  Write-Host '   Pick the profile where you are logged in to the AIUB portal and Teams.'
-  Write-Host '   ("Default" is your first Chrome profile, "Profile 1" the second, and so on.)' -ForegroundColor DarkGray
+  Write-Host '   Pick the account you use for the AIUB portal and Teams (your AIUB e-mail).'
   Write-Host $thin -ForegroundColor DarkGray
   for ($i = 0; $i -lt $profiles.Count; $i++) {
     $p = $profiles[$i]
     $num = '{0,4}' -f ($i + 1)
-    if ($p.Dir -eq $def) {
-      Write-Host ($num + '   ' + $p.Dir.PadRight(16)) -NoNewline -ForegroundColor Cyan
-      Write-Host '<- used last time' -ForegroundColor DarkCyan
-    } else { Write-Host ($num + '   ' + $p.Dir) }
+    $main = $p.Mail; if (-not $main) { $main = $p.Name }; if (-not $main) { $main = $p.Dir }
+    $extra = ''; if ($p.Name -and $p.Name -ne $main) { $extra = $p.Name }; if (-not $p.Mail) { $extra = ($extra + ' (not signed in)').Trim() }
+    if ($p.Mail -match '@([a-z0-9-]+\.)*aiub\.edu$') { $extra = 'AIUB account' }
+    $col = 'Gray'; if ($p.Dir -eq $def) { $col = 'Cyan' }
+    Write-Host ($num + '   ' + $main.PadRight(36)) -NoNewline -ForegroundColor $col
+    Write-Host ($extra.PadRight(22)) -NoNewline -ForegroundColor DarkGray
+    if ($p.Dir -eq $def) { Write-Host '<- used last time' -ForegroundColor DarkCyan } else { Write-Host '' }
   }
   Write-Host $thin -ForegroundColor DarkGray
-  Write-Host ('   Type a number and press Enter (just Enter = ' + $def + '): ') -NoNewline -ForegroundColor White
+  $dp = $profiles | Where-Object { $_.Dir -eq $def } | Select-Object -First 1
+  $dl = $def; if ($dp -and $dp.Mail) { $dl = $dp.Mail } elseif ($dp -and $dp.Name) { $dl = $dp.Name }
+  Write-Host ('   Type a number and press Enter (just Enter = ' + $dl + '): ') -NoNewline -ForegroundColor White
   $a = Read-Host
   $pick = $def
   $n = 0
@@ -136,11 +168,13 @@ $profiles = @(Get-Profiles)
 $first = -not (Test-Path (Join-Path $dest 'installed.txt'))
 $prof = Choose-Profile $profiles
 Write-Host ''
-Step 4 ('Opening Chrome (' + $prof + ')')
+$pp = $profiles | Where-Object { $_.Dir -eq $prof } | Select-Object -First 1
+$plabel = $prof; if ($pp -and $pp.Mail) { $plabel = $pp.Mail } elseif ($pp -and $pp.Name) { $plabel = $pp.Name }
+Step 4 'Opening Chrome'
 $chrome = Find-Chrome
 $urls = @('https://portal.aiub.edu/Student', 'https://teams.cloud.microsoft/')
 if ($first) { $urls = @('chrome://extensions') + $urls }
-if ($chrome) { Start-Process -FilePath $chrome -ArgumentList ('--profile-directory="' + $prof + '" ' + ($urls -join ' ')); Ok '' }
+if ($chrome) { Start-Process -FilePath $chrome -ArgumentList ('--profile-directory="' + $prof + '" ' + ($urls -join ' ')); Ok ('Account: ' + $plabel) }
 else { Warn 'Chrome was not found. Please open Chrome yourself.' }
 try { [IO.File]::WriteAllText((Join-Path $dest 'installed.txt'), (Get-Date -Format s)) } catch { }
 
