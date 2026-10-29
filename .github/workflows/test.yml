@@ -1,0 +1,28 @@
+name: Tests
+
+# Runs every test on a real Windows machine (the helper is PowerShell, so it can only be tested on Windows).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Extension tests
+        run: |
+          node tests/lib.test.js
+          node tests/teams.test.js
+          node tests/zip.test.js
+          node tests/background.test.js
+      - name: Install script (Windows PowerShell)
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\install.test.ps1
+      - name: Helper (Windows PowerShell, native messaging)
+        run: node tests/helper.test.js

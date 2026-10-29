@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AIUB Smart Slide Downloader",
-  "version": "11.1",
+  "version": "11.2",
   "description": "Downloads only new or missing slides/notes from the AIUB portal and your Microsoft Teams classes into Desktop/AIUB/<Course>/, numbered in course order, without duplicates. Asks before installing a new version.",
   "icons": {
     "16": "icon16.png",

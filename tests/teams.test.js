@@ -61,5 +61,33 @@ for (const f of ['lib.js', 'teams.js']) vm.runInContext(fs.readFileSync(path.joi
   r = await ctx.Teams.fetchForCourses({ courses: ['9003 - RESEARCH METHODOLOGY [P]'], semTag: 'FALL 26-27' });
   assert.strictEqual(r.results.length, 1); assert(r.unmatched.some(t => /UNRELATED/.test(t)));
   console.log('ok  looser match inside the semester; unrelated classes are listed as unmatched');
-  console.log('\n5 checks passed');
+  // Assignments ("Class Files" library) and a private channel (its own site "<class> - <channel>")
+  const CH = HOST + '/sites/msteams_593da4-LabGroup';
+  const lib = (t, root) => ({ Title: t, RootFolder: { ServerRelativeUrl: root } });
+  const extra = {
+    '/sites/msteams_593da4/Class Files': { Files: [], Folders: [{ Name: 'Assignment 1', ServerRelativeUrl: '/sites/msteams_593da4/Class Files/Assignment 1' }] },
+    '/sites/msteams_593da4/Class Files/Assignment 1': { Files: [{ Name: 'Brief.pdf', UniqueId: 'id-a1', Length: '300', TimeCreated: '2026-10-27T01:00:00Z' }], Folders: [] },
+    '/sites/msteams_593da4/Student Work': { Files: [{ Name: 'my-answer.docx', UniqueId: 'id-sw', Length: '5', TimeCreated: '2026-10-27T01:00:00Z' }], Folders: [] },
+    '/sites/msteams_593da4-LabGroup/Shared Documents': { Files: [{ Name: 'Lab sheet.pdf', UniqueId: 'id-ch', Length: '77', TimeCreated: '2026-10-27T02:00:00Z' }], Folders: [] },
+  };
+  ctx.fetch = async (url, o) => {
+    const u = decodeURIComponent(url);
+    if (u.includes('/_api/search/query')) return json({ PrimaryQueryResult: { RelevantResults: { Table: { Rows: [
+      { Cells: [{ Key: 'Title', Value: '00942 ADVANCED PROGRAMMING WITH .NET [A][FALL 26-27]' }, { Key: 'Path', Value: SITE }] },
+      { Cells: [{ Key: 'Title', Value: '00942 ADVANCED PROGRAMMING WITH .NET [A][FALL 26-27] - Lab Group' }, { Key: 'Path', Value: CH }] }] } } } });
+    if (u.startsWith(SITE + '/_api/web/lists')) return json({ value: [lib('Documents', '/sites/msteams_593da4/Shared Documents'), lib('Class Files', '/sites/msteams_593da4/Class Files'), lib('Student Work', '/sites/msteams_593da4/Student Work')] });
+    if (u.startsWith(CH + '/_api/web/lists')) return json({ value: [] });
+    if (u.startsWith(CH) && u.includes('DefaultDocumentLibrary')) return json({ ServerRelativeUrl: '/sites/msteams_593da4-LabGroup/Shared Documents' });
+    const m = u.match(/decodedurl='([^']*)'/); if (m && extra[m[1]]) return json(extra[m[1]]);
+    return origFetch(url, o);
+  };
+  r = await ctx.Teams.fetchForCourses(msg);
+  assert.strictEqual(r.status, 'ok'); assert.strictEqual(r.results.length, 2, 'class site + private channel site');
+  const all = r.results.flatMap(x => x.files.map(f => [f.name, f.rel]));
+  assert(all.some(([n, rel]) => n === 'Brief.pdf' && rel === 'Assignment files/Assignment 1'), 'assignment files are read: ' + JSON.stringify(all));
+  assert(!all.some(([n]) => n === 'my-answer.docx'), 'Student Work (own submissions) is skipped');
+  assert(all.some(([n, rel]) => n === 'Lab sheet.pdf' && rel === 'Lab Group'), 'private channel files go into a channel folder: ' + JSON.stringify(all));
+  assert.strictEqual(all.filter(([n]) => n === 'Module 0-5.pdf').length, 1, 'the Shared tab library is read once');
+  console.log('ok  Assignments files ("Class Files") and private channels are read; Student Work is skipped');
+  console.log('\n6 checks passed');
 })().catch(e => { console.error(e); process.exit(1); });

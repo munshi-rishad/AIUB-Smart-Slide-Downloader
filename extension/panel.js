@@ -237,19 +237,24 @@
       return { ok: false, err: e.message };
     }
   };
-  function gate(err) {
+  function gate(err, old) {
     return new Promise(resolve => {
-      sub('One-time setup needed');
+      const zip = `https://github.com/${CFG.UPDATE_REPO}/archive/refs/heads/${CFG.UPDATE_BRANCH}.zip`;
+      sub(old ? 'One-time update needed' : 'One-time setup needed');
       const g = $('g'); g.style.display = 'block';
       const stale = /context invalidated/i.test(err || '');
       g.innerHTML = stale
         ? '<b>Extension was just updated.</b><br>Please refresh this page (F5).'
-        : '<b>Setup needed (one time, 10 seconds)</b><br>Double-click <b>Setup.bat</b> in the AIUB-Smart-Slide-Downloader folder, then press “Check again”.<br>';
+        : old
+          ? '<b>One-time update needed (1 minute)</b><br>This version needs the new helper:<br>1. Click <b>Download latest</b> and extract the zip.<br>2. Double-click <b>Setup.bat</b> inside the new folder<br>(not the old one you downloaded before).<br>3. Press <b>Check again</b>.<br>'
+          : '<b>Setup needed (one time, 1 minute)</b><br>1. Click <b>Download latest</b> and extract the zip (skip this if you already have the folder).<br>2. Double-click <b>Setup.bat</b> in it.<br>3. Press <b>Check again</b>.<br>';
       if (!stale) {
+        const dl = document.createElement('button'); dl.className = 'go'; dl.textContent = 'Download latest';
         const go = document.createElement('button'); go.className = 'go'; go.textContent = 'Check again';
         const no = document.createElement('button'); no.className = 'no'; no.textContent = 'Skip (use Downloads)';
-        g.appendChild(go); g.appendChild(no);
-        if (err) { const e = document.createElement('div'); e.className = 'ge'; e.textContent = 'Not ready yet: ' + err; g.appendChild(e); }
+        g.append(dl, go, no);
+        if (err && !old) { const e = document.createElement('div'); e.className = 'ge'; e.textContent = 'Not ready yet: ' + err; g.appendChild(e); }
+        dl.onclick = () => window.open(zip, '_blank', 'noopener');
         go.onclick = () => { g.style.display = 'none'; sub('Checking…'); resolve('again'); };
         no.onclick = () => { g.style.display = 'none'; resolve('skip'); };
       }
@@ -259,7 +264,7 @@
     for (;;) {
       const r = await send({ cmd: 'listall', folders });
       if (r && r.ok && (r.ver || 1) >= 3) return r.map;
-      if (await gate(r && r.ok ? 'the helper is an older version, run Setup.bat' : (r && r.err)) === 'skip') return null;
+      if (await gate(r && r.ok ? '' : (r && r.err), !!(r && r.ok)) === 'skip') return null;   // r.ok but ver < 3: the helper is from an older version
     }
   }
   // ---------- Teams (the background worker reads SharePoint with the person's own Chrome sign-in) ----------
@@ -462,6 +467,20 @@
   }
   const stopCloseIfAsk = () => { if (updAsk) clearTimeout(closeT); };
 
+  // ---------- The portal page looks different: say so clearly and let the person report it ----------
+  function pageInfo() {   // technical facts only (no names, no course titles, no personal data)
+    const notes = [...document.querySelectorAll('a')].filter(a => /^\s*Notes\s*$/i.test(a.textContent)).length;
+    return `version ${chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '?'} | page ${location.pathname} | Notes links ${notes} | semester list ${findSemSelect() ? 'yes' : 'no'} | tables ${document.querySelectorAll('table').length}`;
+  }
+  function reportBox(what) {
+    const g = $('g'); g.style.display = 'block';
+    g.innerHTML = '<b>The AIUB portal page may have changed</b><br>' + what + '<br>Press <b>Report problem</b> so the extension can be fixed (only technical details are sent, no personal data).<br>';
+    const b = document.createElement('button'); b.className = 'go'; b.textContent = 'Report problem';
+    b.onclick = () => window.open(`https://github.com/${CFG.UPDATE_REPO}/issues/new?title=${encodeURIComponent('Portal page changed: ' + what.replace(/<[^>]+>/g, '').slice(0, 60))}&body=${encodeURIComponent('What happened: ' + what.replace(/<[^>]+>/g, '') + '\n\nDetails: ' + pageInfo())}`, '_blank', 'noopener');
+    g.appendChild(b);
+    stopClose();
+  }
+
   // ---------- Main flow ----------
   async function start() {
     window.__aiubRunning = true;
@@ -476,7 +495,12 @@
     sub('Finding your courses…');
     let courses = extractCourses();
     for (let i = 0; i < 100 && !courses.length; i++) { await new Promise(r => setTimeout(r, 200)); courses = extractCourses(); }
-    if (!courses.length) { sub('No courses found'); setProg(false); msg('No active courses found on this page.', '#c0392b'); $('ch').style.display = 'block'; if (!manual) armClose(2500); return; }
+    if (!courses.length) {
+      sub('No courses found'); setProg(false); msg('No active courses found on this page.', '#c0392b'); $('ch').style.display = 'block';
+      if (findSemSelect()) reportBox('The dashboard is open, but no course with a "Notes" link was found.');   // the page has a semester list, so it IS the dashboard
+      else if (!manual) armClose(2500);
+      return;
+    }
     await runCourses(courses, semTagNow());
   }
 
@@ -596,6 +620,11 @@
       else setBd(c, plural(c.todo.length, 'new file'), 'w');
     }));
     if (helper) await saveIndex(idx);
+    const checked = courses.filter(c => !c.scanErr);
+    const hadPortal = c => Object.keys(idx).some(k => k.startsWith('p:') && (idx[k].p || '').toLowerCase().startsWith(c.folder.toLowerCase() + '/'));
+    if (checked.length && checked.every(c => !c.portal.length) && checked.some(hadPortal)) {   // a new semester (no files yet) never triggers this
+      reportBox('No course showed any portal file, although files were found there before.');
+    }
 
     // download: all courses at once, CFG.DL_PARALLEL files at a time
     setProg(false);

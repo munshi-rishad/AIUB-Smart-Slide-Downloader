@@ -7,7 +7,7 @@ A Chrome extension for AIUB students. Open your portal dashboard and it download
 ## Features
 
 - Greets you by name ("Welcome, Rishad") and checks your active courses only (dropped courses are skipped)
-- Downloads from the portal **and** from the **Shared** tab of every Microsoft Teams class (folders and sub-folders included)
+- Downloads from the portal **and** from Microsoft Teams: the **Shared** tab of every class (folders and sub-folders included), files teachers attach to **Assignments** (folder `Assignment files`) and **private channels** (folder named like the channel)
 - Never downloads the same file twice; the same slide on the portal and on Teams is saved once
 - Files are numbered by content: course outline first, then lectures/modules/chapters in their own order, then labs, assignments and exam material
 - Every name ends with its source: `(PORTAL)`, `(TEAMS)`, `(PORTAL+TEAMS)`, `(TEAMS ZIP)`, `(PORTAL ZIP)`, in capital letters
@@ -17,6 +17,7 @@ A Chrome extension for AIUB students. Open your portal dashboard and it download
 - **Asks before updating:** when a new version is out, the panel and a Windows notification show what is new with **Update now** / **Later**
 - **Saved files follow every new version:** if a new version changes names, folders or tags, your existing files are renamed or moved automatically (nothing is downloaded twice, nothing is deleted)
 - **Old semesters** button: pick an old semester and a course (or all courses) to download its files
+- If the AIUB portal page changes and no courses or files are found, the panel says so and offers **Report problem**
 - Progress bar per course; the panel closes by itself 2 seconds after finishing, never while your mouse is on it
 
 ## Technologies Used
@@ -45,7 +46,8 @@ AIUB-Smart-Slide-Downloader/
 │   ├── install.ps1
 │   ├── host.ps1
 │   └── host.bat
-└── tests/                 node tests (no packages needed)
+├── tests/                 node tests (no packages needed) + Windows helper tests
+└── .github/workflows/     runs all tests on a real Windows machine on every push
 ```
 
 ## Requirements
@@ -69,7 +71,7 @@ Or download the ZIP from GitHub and extract it anywhere.
 3. On the Chrome Extensions page turn on **Developer mode**, click **Load unpacked**, press Ctrl+V (the path is already copied) and select the folder. Chrome does not allow programs to install extensions silently, so this step is done once by hand.
 4. Open your AIUB dashboard (`portal.aiub.edu/Student`). The panel appears and downloads your files.
 
-Users of version 10.2 or older: run `Setup.bat` once with these files. After that, updates arrive by themselves.
+Users of version 10.2 or older: the extension updates itself to the new version once, then shows **One-time update needed**. Click **Download latest**, extract the zip, run `Setup.bat` from the **new** folder and press **Check again**. After that, updates arrive by themselves.
 
 ## Updates
 
@@ -103,7 +105,7 @@ The portal switches back to your original semester when the panel closes.
 
 ## How Teams Works
 
-Every Teams class keeps its Shared files in a SharePoint library (`aiubedu60714.sharepoint.com/sites/msteams_…`). The extension reads it with the sign-in of your Chrome profile. No password, token or Microsoft Graph app is used, and nothing on SharePoint is changed. Classes are matched to your portal courses by name and semester. If you are not signed in, the panel asks you to connect your Teams account (**Open Teams** / **Check again** / **Skip Teams**).
+Every Teams class keeps its files in SharePoint (`aiubedu60714.sharepoint.com/sites/msteams_…`): the Shared tab in *Shared Documents*, files attached to Assignments in *Class Files*, and each private channel on its own site. Your own submissions (*Student Work*) are not downloaded. The extension reads them with the sign-in of your Chrome profile. No password, token or Microsoft Graph app is used, and nothing on SharePoint is changed. Classes are matched to your portal courses by name and semester. If you are not signed in, the panel asks you to connect your Teams account (**Open Teams** / **Check again** / **Skip Teams**).
 
 ## Troubleshooting
 

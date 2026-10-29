@@ -77,7 +77,19 @@ const Teams = (() => {
     return [...found.values()].filter(s => s.title);
   }
 
-  // every file of the site's document library, folders included
+  // every visible document library of a class site: "Shared Documents" (the Shared tab), "Class Files" (files the teacher
+  // attaches to Assignments) and any other library. "Student Work" (your own submissions) and system libraries are skipped.
+  const SKIP_LIBS = /^(student work|site assets|style library|form templates|site pages|teams wiki data|preservation hold library|documents?\s*-\s*archived?)$/i;
+  const LIB_DIR = { 'class files': 'Assignment files' };   // local sub-folder name for a library (the Shared tab library has none)
+  async function libraries(site) {
+    try {
+      const j = await spJson(`${site.url}/_api/web/lists?$filter=BaseTemplate eq 101 and Hidden eq false&$select=Title,RootFolder/ServerRelativeUrl&$expand=RootFolder`);
+      return (j.value || []).filter(l => l.RootFolder && l.RootFolder.ServerRelativeUrl && !SKIP_LIBS.test(String(l.Title || '').trim()))
+        .map(l => ({ title: String(l.Title).trim(), root: l.RootFolder.ServerRelativeUrl }));
+    } catch (e) { if (e instanceof SpAuthError) throw e; return []; }
+  }
+
+  // every file of the site's libraries, folders included
   async function listFiles(site) {
     const out = [];
     let rootUrl;
@@ -99,7 +111,15 @@ const Teams = (() => {
       await Promise.all((j.Folders || []).filter(d => !(d.Name.startsWith('_') || (depth === 0 && d.Name === 'Forms')))   // not SharePoint's own system folders
         .map(d => walk(d.ServerRelativeUrl, rel ? rel + '/' + d.Name : d.Name, depth + 1)));   // all sub-folders at the same time
     }
-    await walk(rootUrl, '', 0);
+    const pre = site.channel ? site.channel : '';   // a private channel has its own site: its files go into a folder named like the channel
+    await walk(rootUrl, pre, 0);   // the Shared tab: a failure here is a real error (reported, nothing is renumbered)
+    const done = new Set([rootUrl.toLowerCase()]);
+    for (const lib of await libraries(site)) {
+      if (done.has(lib.root.toLowerCase())) continue; done.add(lib.root.toLowerCase());
+      const dir = LIB_DIR[lib.title.toLowerCase()] || lib.title;
+      try { await walk(lib.root, pre ? pre + '/' + dir : dir, 0); }
+      catch (e) { if (e instanceof SpAuthError) throw e; if (!/answered (401|403|404)/.test(e.message)) throw e; }   // a library you may not open is simply skipped
+    }
     return out;
   }
 
@@ -115,12 +135,20 @@ const Teams = (() => {
       const sites = await discoverSites();
       const courses = msg.courses || [];
       let wanted = [];
-      for (const s of sites) { const m = AIUB.matchCourse(s.title, courses, msg.semTag); if (m) wanted.push({ site: s, course: m.course }); }
+      // a private channel has its own site titled "<class> - <channel>": matched by the class part, files go into a <channel> folder
+      const match = (s, list, min) => {
+        let m = AIUB.matchCourse(s.title, list, msg.semTag, min);
+        if (m) return m;
+        const i = s.title.lastIndexOf(' - ');
+        if (i > 0 && /\/sites\/msteams_[^/]*-[^/]+$/i.test(s.url)) { m = AIUB.matchCourse(s.title.slice(0, i), list, msg.semTag, min); if (m) s.channel = AIUB.sanitize(s.title.slice(i + 3)).slice(0, 60); }
+        return m;
+      };
+      for (const s of sites) { const m = match(s, courses); if (m) wanted.push({ site: s, course: m.course }); }
       // second chance: a course that found no class + a class that matched nothing -> looser name match (same semester only)
       const need = courses.filter(c => !wanted.some(w => w.course === c));
       for (const s of sites) {
         if (!need.length || wanted.some(w => w.site === s)) continue;
-        const m = AIUB.matchCourse(s.title, need, msg.semTag, AIUB.CFG.COURSE_SIM_LOOSE);
+        const m = match(s, need, AIUB.CFG.COURSE_SIM_LOOSE);
         if (m) { wanted.push({ site: s, course: m.course }); need.splice(need.indexOf(m.course), 1); }
       }
       if (!msg.semTag) {   // semester unknown: when a course has classes from several semesters, only the newest one counts

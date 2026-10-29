@@ -1,4 +1,10 @@
 {
+  "11.2": [
+    "Files teachers attach to Teams Assignments are downloaded too (folder \"Assignment files\")",
+    "Private channel files are downloaded (folder named like the channel)",
+    "If the AIUB portal page changes, the panel says so and offers \"Report problem\"",
+    "Clearer one-time update message with a \"Download latest\" button"
+  ],
   "11.1": [
     "Checks for a new version every time you open the dashboard",
     "Clearer setup window: Chrome profiles are listed by e-mail address"
