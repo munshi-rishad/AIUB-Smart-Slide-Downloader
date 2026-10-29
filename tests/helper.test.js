@@ -12,10 +12,19 @@ p.stdout.on('data', d => {
   buf = Buffer.concat([buf, d]);
   while (buf.length >= 4) { const n = buf.readUInt32LE(0); if (buf.length < 4 + n) break; const m = JSON.parse(buf.slice(4, 4 + n).toString()); buf = buf.slice(4 + n); const w = wait.get(m.id); if (w) { wait.delete(m.id); w(m); } }
 });
-const call = (op, fields, data) => new Promise(res => { const m = { id: ++id, op, ...fields }; if (data !== undefined) m.data = data; const b = Buffer.from(JSON.stringify(m)); const h = Buffer.alloc(4); h.writeUInt32LE(b.length); wait.set(m.id, res); p.stdin.write(Buffer.concat([h, b])); });
+const call = (op, fields, data) => new Promise((res, rej) => {
+  const m = { id: ++id, op, ...fields }; if (data !== undefined) m.data = data;
+  const b = Buffer.from(JSON.stringify(m)); const h = Buffer.alloc(4); h.writeUInt32LE(b.length);
+  const to = setTimeout(() => { wait.delete(m.id); rej(new Error('no answer from the helper for "' + op + '" within 20 s')); }, 20000);
+  wait.set(m.id, v => { clearTimeout(to); res(v); }); p.stdin.write(Buffer.concat([h, b]));
+});
+const ci = !!process.env.GITHUB_ACTIONS;
+const log = console.log; console.log = t => { log(t); if (ci && /^ok  /.test(t)) log('::notice::' + t); };
+p.on('exit', c => { if (c !== null) log((ci ? '::warning::' : '') + 'helper exited with code ' + c); });
 const save = async (folder, name, text) => { const fid = ++id + 1000; assert((await call('begin', { fid, folder, name })).ok); assert((await call('chunk', { fid }, Buffer.from(text).toString('base64'))).ok); assert((await call('end', { fid })).ok); };
 const ex = (...a) => fs.existsSync(path.join(root, ...a));
 (async () => {
+  log((ci ? '::notice::' : '') + 'desktop: ' + desk);
   let r = await call('ping', {}); assert.strictEqual(r.ver, 3); console.log('ok  helper version 3');
   await save(`${T}/Old Course/Lab`, '01 - A.pdf', 'hello'); await save(`${T}/Old Course/Lab`, 'B.pdf', 'b'); await save(`${T}/New`, 'TAKEN.PDF', 'other');
   assert.strictEqual(fs.readFileSync(path.join(root, T, 'Old Course', 'Lab', '01 - A.pdf'), 'utf8'), 'hello'); console.log('ok  a file is saved (begin/chunk/end)');
@@ -54,4 +63,4 @@ const ex = (...a) => fs.existsSync(path.join(root, ...a));
   for (const [n, b] of Object.entries(saved)) if (n !== 'obsolete.js') fs.writeFileSync(path.join(ext, n), b);   // restore the repository files
   p.stdin.end(); fs.rmSync(path.join(root, T), { recursive: true, force: true });
   console.log('\n7 checks passed'); process.exit(0);
-})().catch(e => { console.error('FAIL:', e.message); try { fs.rmSync(path.join(root, T), { recursive: true, force: true }); } catch (_) {} process.exit(1); });
+})().catch(e => { log((ci ? '::error::' : '') + 'FAIL: ' + e.message); try { fs.rmSync(path.join(root, T), { recursive: true, force: true }); } catch (_) {} process.exit(1); });

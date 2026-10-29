@@ -10,6 +10,7 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,4 +26,5 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\install.test.ps1
       - name: Helper (Windows PowerShell, native messaging)
+        timeout-minutes: 5
         run: node tests/helper.test.js
