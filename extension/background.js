@@ -4,6 +4,8 @@ const clean = s => s.replace(/[<>:"\/\\|?*\x00-\x1f]/g, '').replace(/\s+/g, ' ')
 const hasExt = n => /\.[A-Za-z0-9]{1,6}$/.test(n);
 const cleanPath = p => String(p).split('/').map(clean).filter(Boolean).join('/');   // "Course/Lab/Week 1"
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const asList = v => (Array.isArray(v) ? v : v == null ? [] : [v]);   // PowerShell sends a list of one as a single value
+const asMap = m => Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k, asList(v).map(String)]));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -258,10 +260,10 @@ function nameFromHeaders(h) {
 async function listAll(folders) {
   try {
     const r = await call('listall', { folders });
-    return { ok: true, map: r.map || {}, ver: r.ver || 1 };
+    return { ok: true, map: asMap(r.map), ver: r.ver || 1 };
   } catch (e) {
     if (/unknown op/i.test(e.message)) {   // older helper: ask folder by folder
-      try { const map = {}; for (const f of folders) map[f] = (await call('list', { folder: f })).names || []; return { ok: true, map }; }
+      try { const map = {}; for (const f of folders) map[f] = asList((await call('list', { folder: f })).names); return { ok: true, map }; }
       catch (e2) { return { ok: false, err: e2.message }; }
     }
     return { ok: false, err: e.message };
@@ -270,12 +272,12 @@ async function listAll(folders) {
 
 // rename / move saved files (also into other folders): [{ f: 'Course/Old.pdf', t: 'Course/Sub/New.pdf' }] -> { ok, done: [indexes that moved] }
 async function moveFiles(pairs) {
-  try { const r = await call('moveall', { pairs: pairs.map(p => ({ f: cleanPath(p.f), t: cleanPath(p.t) })), prune: true }); return { ok: true, done: r.done || [] }; }
+  try { const r = await call('moveall', { pairs: pairs.map(p => ({ f: cleanPath(p.f), t: cleanPath(p.t) })), prune: true }); return { ok: true, done: asList(r.done).map(Number) }; }
   catch (e) { return { ok: false, err: e.message, done: [] }; }
 }
 // list folders WITHOUT creating them (folders an older version used)
 async function listFolders(folders) {
-  try { const r = await call('listx', { folders: folders.map(cleanPath) }); return { ok: true, map: r.map || {} }; }
+  try { const r = await call('listx', { folders: folders.map(cleanPath) }); return { ok: true, map: asMap(r.map) }; }
   catch (e) { return { ok: false, err: e.message }; }
 }
 

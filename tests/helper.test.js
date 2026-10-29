@@ -28,8 +28,9 @@ const ex = (...a) => fs.existsSync(path.join(root, ...a));
   let r = await call('ping', {}); assert.strictEqual(r.ver, 3); console.log('ok  helper version 3');
   await save(`${T}/Old Course/Lab`, '01 - A.pdf', 'hello'); await save(`${T}/Old Course/Lab`, 'B.pdf', 'b'); await save(`${T}/New`, 'TAKEN.PDF', 'other');
   assert.strictEqual(fs.readFileSync(path.join(root, T, 'Old Course', 'Lab', '01 - A.pdf'), 'utf8'), 'hello'); console.log('ok  a file is saved (begin/chunk/end)');
-  r = await call('listx', { folders: [`${T}/Does Not Exist`, `${T}/Old Course/Lab`] });
+  r = await call('listx', { folders: [`${T}/Does Not Exist`, `${T}/Old Course/Lab`, `${T}/New`] });
   assert.strictEqual(r.map[`${T}/Does Not Exist`].length, 0); assert(!ex(T, 'Does Not Exist'), 'listx must not create folders');
+  assert(Array.isArray(r.map[`${T}/New`]) && r.map[`${T}/New`].length === 1, 'a folder with ONE file must still come back as a list: ' + JSON.stringify(r.map[`${T}/New`]));
   assert.strictEqual(r.map[`${T}/Old Course/Lab`].length, 2); console.log('ok  listx lists without creating folders');
   r = await call('moveall', { prune: true, pairs: [
     { f: `${T}/Old Course/Lab/01 - A.pdf`, t: `${T}/New/Sub/01 - A (PORTAL).PDF` },   // other folder + new name

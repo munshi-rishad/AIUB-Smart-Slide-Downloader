@@ -52,7 +52,7 @@ function List-NoCreate([string]$folder) {
   $d = $root
   foreach ($seg in ([string]$folder -split '/')) { if ($seg.Trim()) { $d = Join-Path $d (Safe $seg) } }
   if ($d -eq $root -or -not [IO.Directory]::Exists($d)) { return ,@() }
-  return (Have-Names $d)
+  return ,(Have-Names $d)   # the comma keeps it a list even with 0 or 1 file
 }
 function Prune-Empty([string]$d) {
   # removes a folder that became empty after moving files out of it (and its empty parents), never Desktop\AIUB itself
